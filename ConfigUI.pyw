@@ -33,6 +33,7 @@ import json
 import time
 import sys
 import traceback
+import copy
 
 __version__ = (0,0,1)
 debug = True
@@ -238,8 +239,6 @@ class GUI(tk.Frame):
         self.top.load_dir(opt.get('dir') or os.getcwd())
 
         self.data_frame = tk.Frame(self)
-#        self.display = VerticalScrolledFrame(self.data_frame)
-#        self.display.pack(fill=tk.BOTH, expand=True)
         self.data_frame.pack(fill=tk.BOTH, expand=True)
 
         self.status = tk.StringVar(self, "Version: "+".".join(map(str,__version__)))
@@ -273,9 +272,6 @@ class GUI(tk.Frame):
             print("WARNING: %s root elements found; one expected")
         assert elements, "No XML data found"
 
-#        if self.display is not None:
-#            self.display.destroy()
-#            del self.display
         start = elements[0]
         if start.name == "config_machines":
             self.xmlmachines = XMLMachines(self, start)            
@@ -329,30 +325,41 @@ class GUI(tk.Frame):
 
         self.status.set("File backed up and saved.")
 
+class XMLMachineEditor(tk.Frame):
+    def __init__(self, master, bs):
+        tk.Frame.__init__(self, master.master)
+        self.data_frame = tk.Frame(self)
+        self.display = VerticalScrolledFrame(self.data_frame)
+        lblframe = self.make_label_frame(master, bs)
+        self.display.pack(fill=tk.BOTH, expand=True)
+        self.data_frame.pack(fill=tk.BOTH, expand=True)
+        lblframe.pack()
+        
     def make(self, frame, bs):
         children = list(filter(istag, bs.children))
+#        if debug: print(f"children = {children}")
         idx = 0
         num_attributes = len(bs.attrs)
         num_text = 0 if bs.string is None else 1
-#        if bs.name == "config_machines":
-        #        if debug:
+#        if debug:
 #            print("{}: {} attributes; {} text; {} grandchildren".format(bs.name, num_attributes, num_text, len(children)))
 
         # list out the attributes, then text, then grandchildren.
-#        for attr, value in bs.attrs.items():
-#            # attribute entry
-#            idx = self.make_entry(frame, idx, attr, value.strip(), partial(self.change_attr, bs, attr))
-#        if bs.string is not None:
-#            # text entry
-#            idx = self.make_entry(frame, idx, "", bs.text.strip(), partial(self.change_attr, bs, None))
+        for attr, value in bs.attrs.items():
+            # attribute entry
+            
+            idx = self.make_entry(frame, idx, attr, value.strip(), partial(self.change_attr, bs, attr))
+        if bs.string is not None:
+            # text entry
+            idx = self.make_entry(frame, idx, "", bs.text.strip(), partial(self.change_attr, bs, None))
         for child in children:
             num_children = len(child.findChildren()) + len(child.attrs)
-#            if num_children == 0 and child.string is not None:
-#                # special case of only 1 text - making entry
-#                idx = self.make_entry(frame, idx, child.name, child.string.strip(), partial(self.change_attr, child, None))
-            if num_children > 0:
+            if num_children == 0 and child.string is not None:
+                # special case of only 1 text - making entry
+                if debug: print(f"name = {child.name} string = {child.string.strip()}")
+                idx = self.make_entry(frame, idx, child.name, child.string.strip(), partial(self.change_attr, child, None))
+            elif num_children > 0:
                 # child has one attribute or one grandchild; make new frame
-                print(f"bs.name is {bs.name}, child.name is {child.name}")
                 h = self.make_label_frame(frame, child)
                 h.grid(row=idx, column=0, columnspan=2, sticky='ew', padx=10, pady=10)
                 idx += 1
@@ -360,8 +367,8 @@ class GUI(tk.Frame):
 
     @staticmethod
     def make_entry(master, row, name, value, command):
-        if debug:
-            print(f"name {name} value {value}")
+#        if debug:
+#            print(f"name {name} value {value}")
         lbl = tk.Label(master, text=name, anchor='e')
         lbl.grid(row=row, column=0, sticky='ew')
         ent = AutoSelectEntry(master, width=opt['entrybox_width'], command=command)
@@ -389,21 +396,20 @@ class GUI(tk.Frame):
             bs[attr] = new_text
         self.dirty_status()
 
+
+        
+
 class XMLMachines(tk.Frame):
     def __init__(self, master, bs):
         tk.Frame.__init__(self, master.master)
         self.root = master
-        #        self.root.geometry("200x250")
-        self._machine_names = []
-#        core = self.make_label_frame(root, bs)
-#        core.pack()
+        self.bsmachines = {}
         scrollbar = ttk.Scrollbar(self.root)
         self.display = ttk.Treeview(self.root, yscrollcommand=scrollbar.set, show="tree", selectmode="browse")
         scrollbar.configure(command=self.display.yview)
         scrollbar.pack(side="right", fill="y")
         self.display.pack(expand=True, fill=tk.BOTH)
-#        lbl = ttk.Label(self, textvariable=self.status)
-#        lbl.pack(fill=tk.X)
+
         self.define_buttons()
 
         self.newmach.grid(row=0,column=0)
@@ -420,15 +426,32 @@ class XMLMachines(tk.Frame):
 
     def new_machine(self):
         """ Copy the example machine description into a new machine name """
+        
         if debug: print("new machine called")
+
     def edit_machine(self):
         """ Edit the selected machine description """
         machine = self.display.item(self.display.selection()[0], option="text")
         if debug: print(f"edit machine called, machine is {machine}")
+        ew = tk.Toplevel(self)
+        ew.title("Machine XML Editor")
+        XMLMachineEditor(ew, self.bsmachines[machine])
+
     def copy_machine(self):
         """ Copy the given machine description into a new machnine name """
+        
         machine = self.display.item(self.display.selection()[0], option="text")
         if debug: print(f"copy machine called, machine is {machine}")
+        new_machine_name = tk.simpledialog.askstring(title="Copy", prompt="Enter the new machine name:")
+        if debug: print(f"new_machine is {new_machine_name}")
+        if new_machine_name in self.bsmachines:
+            print(f"ERROR: match to name in list")
+        elif new_machine_name:
+            self.bsmachines[new_machine_name] = copy.copy(self.bsmachines[machine])
+            self.bsmachines[new_machine_name].attrs["MACH"] = new_machine_name
+            self.bsmachines[machine].find_parent().append(self.bsmachines[new_machine_name])
+            self.display.insert("", "end", text=new_machine_name)
+            
     def delete_machine(self):
         """ Delete the given machine - eventually this should apply to all cesm config xml files """
         machine = self.display.item(self.display.selection()[0], option="text")
@@ -470,8 +493,9 @@ class XMLMachines(tk.Frame):
         for child in children:
             # attribute entry
             if child.name == "machine":
-                self.display.insert("", "end", text=child.attrs["MACH"])
-
+                name = child.attrs["MACH"]
+                self.display.insert("", "end", text=name)
+                self.bsmachines[name] = child
 
 
         
