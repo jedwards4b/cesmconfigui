@@ -78,8 +78,8 @@ class FilePicker(tk.Frame):
         self.files = ttk.OptionMenu(hlm, self.file)
         self.files.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-        btn = ttk.Button(hlm, text="Save", command=master.save)
-        btn.pack(side=tk.LEFT)
+#        btn = ttk.Button(hlm, text="Save", command=master.save)
+#        btn.pack(side=tk.LEFT)
 
     def update_options(self, options):
         self.files['menu'].delete(0, tk.END)
@@ -229,8 +229,7 @@ class GUI(tk.Frame):
         master.title("CIME Configure and XML File Editor")
         master.geometry(opt.get('geometry'))
         master.protocol('WM_DELETE_WINDOW', self._quit)
-        master.bind("<Control - S>", self.save)
-        master.bind("<Control - s>", self.save)
+
         self.master = master
         self.top = FilePicker(self, command=self.load_file)
         self.top.pack(fill=tk.X)
@@ -278,49 +277,6 @@ class GUI(tk.Frame):
             print(f"start.name {start.name} is not (yet) supported")
             raise
         
-    def save(self, event=None):
-        print("Saving data")
-
-        # trigger current variable if needed
-        current = self.focus_get()
-        if hasattr(current, 'input_change'):
-            current.input_change()
-
-        try:
-            self.save_core()
-        except Exception as e:
-            showerror("Save Error", "Could not save file.\n"+str(e))
-            if debug: raise
-
-    def save_core(self):
-        if self.fn is None:
-            print("cannot save - no file loaded")
-            self.status.set("cannot save - no file loaded")
-            return
-        name, ext = os.path.splitext(self.fn)
-        bkup_name = name + time.strftime("_%Y-%m-%d_%H-%M-%S") + ext + opt['backup_ext']
-        os.rename(self.fn, bkup_name)
-        print(self.fn, "backed up to", bkup_name)
-
-        # whatever weirdness Andrew uses encodes in utf-16 and with windows-style line endings ... so I will too.
-        # but beautifulsoup insists on normal output, so have to change it first.
-        encoding = opt['output_encoding']
-        if encoding == 'autodetect':
-            encoding = self.bs.original_encoding
-            print(encoding, "encoding autodetected")
-            if encoding.startswith('utf-16'): # remove the "le" (MS BOM)
-                encoding = 'utf-16'
-
-#        data = self.bs.prettify()
-#
-#        data = data.replace('\n', '\r\n')  # Windows ... (sigh)
-#        data = data.replace('utf-8', encoding, 1)  # BS insists on utf8 output from prettify
-
-        with codecs.open(self.fn, 'w', encoding) as f:
-            f.write(data)
-
-        for element in AutoSelectEntry.elements:
-            element.dirty = False
 
         self.status.set("File backed up and saved.")
 
@@ -350,10 +306,14 @@ class RadiobuttonMenu:
 class XMLMachineEditor(tk.Frame):
     def __init__(self, master, bs):
         tk.Frame.__init__(self, master.master)
+        master.bind("<Control - S>", self.save)
+        master.bind("<Control - s>", self.save)
+        self.master = master
         self.mb = None
         self.data_frame = tk.Frame(self)
         self.display = VerticalScrolledFrame(self.data_frame)
         lblframe = self.make_label_frame(master, bs)
+        self.define_buttons(master)
         self.display.pack(fill=tk.BOTH, expand=True)
         self.data_frame.pack(fill=tk.BOTH, expand=True)
         lblframe.pack()
@@ -436,12 +396,72 @@ class XMLMachineEditor(tk.Frame):
             bs[attr] = new_text
         self.dirty_status()
 
+    def define_buttons(self, master):
+        frame = ttk.Frame(master)
+        frame.columnconfigure(0, weight=1)
+        save = ttk.Button(frame, text="Save", command=lambda: self.exitwin('save'))
+        cancel = ttk.Button(frame, text="Cancel", command=lambda: self.exitwin('cancel'))
+        frame.pack(side=tk.BOTTOM)
+        save.grid(row=0,column=0)
+        cancel.grid(row=0,column=1)
+        
+    def save(self, event=None):
+        print("Saving data")
 
+        # trigger current variable if needed
+        current = self.focus_get()
+        if hasattr(current, 'input_change'):
+            current.input_change()
+
+        try:
+            self.save_core()
+        except Exception as e:
+            showerror("Save Error", "Could not save file.\n"+str(e))
+            if debug: raise
+
+    def save_core(self):
+        if self.fn is None:
+            print("cannot save - no file loaded")
+            self.status.set("cannot save - no file loaded")
+            return
+        name, ext = os.path.splitext(self.fn)
+        bkup_name = name + time.strftime("_%Y-%m-%d_%H-%M-%S") + ext + opt['backup_ext']
+        os.rename(self.fn, bkup_name)
+        print(self.fn, "backed up to", bkup_name)
+
+        # whatever weirdness Andrew uses encodes in utf-16 and with windows-style line endings ... so I will too.
+        # but beautifulsoup insists on normal output, so have to change it first.
+        encoding = opt['output_encoding']
+        if encoding == 'autodetect':
+            encoding = self.bs.original_encoding
+            print(encoding, "encoding autodetected")
+            if encoding.startswith('utf-16'): # remove the "le" (MS BOM)
+                encoding = 'utf-16'
+
+#        data = self.bs.prettify()
+#
+#        data = data.replace('\n', '\r\n')  # Windows ... (sigh)
+#        data = data.replace('utf-8', encoding, 1)  # BS insists on utf8 output from prettify
+
+        with codecs.open(self.fn, 'w', encoding) as f:
+            f.write(data)
+
+        for element in AutoSelectEntry.elements:
+            element.dirty = False
+
+    def exitwin(self, method):
+        if debug: print(f"exitwin: {method}")
+        if method == "save":
+            self.save()
+        self.master.destroy()
+        
         
 
 class XMLMachines(tk.Frame):
     def __init__(self, master, bs):
         tk.Frame.__init__(self, master.master)
+        master.bind("<Control - S>", self.save)
+        master.bind("<Control - s>", self.save)
         self.root = master
         self.bsmachines = {}
         scrollbar = ttk.Scrollbar(self.root)
@@ -452,11 +472,6 @@ class XMLMachines(tk.Frame):
 
         self.define_buttons()
 
-        self.newmach.grid(row=0,column=0)
-        self.editmach.grid(row=0,column=1)
-        self.copymach.grid(row=0,column=2)
-        self.deletemach.grid(row=0,column=3)
-        
         if debug: print("Loaded {} elements".format(len(AutoSelectEntry.elements)))
         self._frame = ttk.LabelFrame(master, text="Machine Selection")
         hlm = tk.Frame(self._frame)
@@ -496,15 +511,24 @@ class XMLMachines(tk.Frame):
         """ Delete the given machine - eventually this should apply to all cesm config xml files """
         machine = self.display.item(self.display.selection()[0], option="text")
         if debug: print(f"delete machine called, machine is {machine}")
-
+        
+        self.display.delete(self.display.focus())
+        self.bsmachines[machine].decompose()
+        del self.bsmachines[machine]
+        
     def define_buttons(self):
         frame = ttk.Frame(self.root)
         frame.columnconfigure(0, weight=1)
-        self.newmach = ttk.Button(frame, text="New", command=self.new_machine)
-        self.editmach = ttk.Button(frame, text="Edit", command=self.edit_machine)
-        self.copymach = ttk.Button(frame, text="Copy", command=self.copy_machine)
-        self.deletemach = ttk.Button(frame, text="Delete", command=self.delete_machine)
+        newmach = ttk.Button(frame, text="New", command=self.new_machine)
+        editmach = ttk.Button(frame, text="Edit", command=self.edit_machine)
+        copymach = ttk.Button(frame, text="Copy", command=self.copy_machine)
+        deletemach = ttk.Button(frame, text="Delete", command=self.delete_machine)
         frame.pack(side=tk.BOTTOM)
+        newmach.grid(row=0,column=0)
+        editmach.grid(row=0,column=1)
+        copymach.grid(row=0,column=2)
+        deletemach.grid(row=0,column=3)
+        
 
         
     def make_label_frame(self, master, bs):
@@ -537,6 +561,49 @@ class XMLMachines(tk.Frame):
                 self.display.insert("", "end", text=name)
                 self.bsmachines[name] = child
 
+    def save(self, event=None):
+        print("Saving data")
+
+        # trigger current variable if needed
+        current = self.focus_get()
+        if hasattr(current, 'input_change'):
+            current.input_change()
+
+        try:
+            self.save_core()
+        except Exception as e:
+            showerror("Save Error", "Could not save file.\n"+str(e))
+            if debug: raise
+
+    def save_core(self):
+        if self.fn is None:
+            print("cannot save - no file loaded")
+            self.status.set("cannot save - no file loaded")
+            return
+        name, ext = os.path.splitext(self.fn)
+        bkup_name = name + time.strftime("_%Y-%m-%d_%H-%M-%S") + ext + opt['backup_ext']
+        os.rename(self.fn, bkup_name)
+        print(self.fn, "backed up to", bkup_name)
+
+        # whatever weirdness Andrew uses encodes in utf-16 and with windows-style line endings ... so I will too.
+        # but beautifulsoup insists on normal output, so have to change it first.
+        encoding = opt['output_encoding']
+        if encoding == 'autodetect':
+            encoding = self.bs.original_encoding
+            print(encoding, "encoding autodetected")
+            if encoding.startswith('utf-16'): # remove the "le" (MS BOM)
+                encoding = 'utf-16'
+
+#        data = self.bs.prettify()
+#
+#        data = data.replace('\n', '\r\n')  # Windows ... (sigh)
+#        data = data.replace('utf-8', encoding, 1)  # BS insists on utf8 output from prettify
+
+        with codecs.open(self.fn, 'w', encoding) as f:
+            f.write(data)
+
+        for element in AutoSelectEntry.elements:
+            element.dirty = False
 
         
 def istag(test):
