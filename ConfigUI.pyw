@@ -220,7 +220,6 @@ class AutoSelectEntry(ttk.Entry):
         if run:
             self.input_change(text)
 
-
 class GUI(tk.Frame):
     def __init__(self, master):
         tk.Frame.__init__(self, master)
@@ -312,10 +311,10 @@ class GUI(tk.Frame):
             if encoding.startswith('utf-16'): # remove the "le" (MS BOM)
                 encoding = 'utf-16'
 
-        data = self.bs.prettify()
-
-        data = data.replace('\n', '\r\n')  # Windows ... (sigh)
-        data = data.replace('utf-8', encoding, 1)  # BS insists on utf8 output from prettify
+#        data = self.bs.prettify()
+#
+#        data = data.replace('\n', '\r\n')  # Windows ... (sigh)
+#        data = data.replace('utf-8', encoding, 1)  # BS insists on utf8 output from prettify
 
         with codecs.open(self.fn, 'w', encoding) as f:
             f.write(data)
@@ -325,16 +324,40 @@ class GUI(tk.Frame):
 
         self.status.set("File backed up and saved.")
 
+class RadiobuttonMenu:
+    def __init__(self, master, bs, row, column, options):
+        mb = tk.Menubutton(master, width=opt['entrybox_width'], text=bs.name+": "+options[0])
+        mb.menu = tk.Menu(mb, tearoff=0)
+        mb['menu'] = mb.menu
+        if debug: print(f"options are {options}")
+        self.val = tk.IntVar()
+        self.options = options
+        self.bs = bs
+        self.mb = mb
+        cnt = 0
+        for text in options:
+            mb.menu.add_radiobutton(label=text, variable=self.val, value=cnt, command=self.selected)
+            cnt = cnt + 1
+        mb.grid(row=row, column=column, sticky='e')
+    
+    def selected(self):
+        value = self.options[self.val.get()]
+        if debug: print(f"In RadiobuttonMenu selection {self.options[self.val.get()]}")
+        self.mb.configure(text=self.bs.name + ": " + value)
+        self.bs.string = value
+
+        
 class XMLMachineEditor(tk.Frame):
     def __init__(self, master, bs):
         tk.Frame.__init__(self, master.master)
+        self.mb = None
         self.data_frame = tk.Frame(self)
         self.display = VerticalScrolledFrame(self.data_frame)
         lblframe = self.make_label_frame(master, bs)
         self.display.pack(fill=tk.BOTH, expand=True)
         self.data_frame.pack(fill=tk.BOTH, expand=True)
         lblframe.pack()
-        
+                
     def make(self, frame, bs):
         children = list(filter(istag, bs.children))
 #        if debug: print(f"children = {children}")
@@ -357,7 +380,24 @@ class XMLMachineEditor(tk.Frame):
             if num_children == 0 and child.string is not None:
                 # special case of only 1 text - making entry
                 if debug: print(f"name = {child.name} string = {child.string.strip()}")
-                idx = self.make_entry(frame, idx, child.name, child.string.strip(), partial(self.change_attr, child, None))
+                if child.name in ("OS", "BATCH_SYSTEM"):
+                    if child.name == "OS":
+                        options = ["LINUX", "CNL"]
+                    elif child.name == "BATCH_SYSTEM":
+                        options = ["pbs", "slurm", "cobalt", "moab", "lsf", "none"]
+                    osselect = RadiobuttonMenu(frame, bs=child, row=idx, column=1, options=options)
+                    idx += 1
+                elif child.name in ("GMAKE_J", "MAX_TASKS_PER_NODE", "MAX_MPITASKS_PER_NODE"):
+                    lbl = tk.Label(frame, text=child.name)
+                    lbl.grid(row=idx, column=0, sticky='ew')
+                    my_var = tk.StringVar()
+                    my_var.set(child.string.strip())
+                    if debug: print(f"spinbox {child.name} value {my_var.get()}")
+                    sb = ttk.Spinbox(frame, from_=1, to=256, width=opt['entrybox_width'], textvariable=my_var)
+                    sb.grid(row=idx, column=1, sticky='e')
+                    idx=idx+1
+                else:
+                    idx = self.make_entry(frame, idx, child.name, child.string.strip(), partial(self.change_attr, child, None))
             elif num_children > 0:
                 # child has one attribute or one grandchild; make new frame
                 h = self.make_label_frame(frame, child)
