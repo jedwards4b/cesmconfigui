@@ -7,17 +7,7 @@ from tkinter import ttk
 from tkinter import filedialog as fd
 from tkinter.messagebox import showinfo, showerror
 import sys, os
-cimeroot = os.environ.get("CIMEROOT")
-if cimeroot is None:
-    raise SystemExit("ERROR: CIMEROOT must be defined in environment")
-
-_LIBDIR = os.path.join(cimeroot)
-sys.path.append(_LIBDIR)
-_LIBDIR = os.path.join(cimeroot,"CIME", "Tools")
-sys.path.append(_LIBDIR)
-
-from CIME.XML import files
-
+from src import CIME_interface
 
 # default options
 opt = {
@@ -36,7 +26,7 @@ opt = {
 class XMLMachines(tk.Frame):
     def __init__(self, root):
         tk.Frame.__init__(self, root)
-        self.cime = CIME_interface()
+        self.cime = CIME_interface(cimeroot="/glade/u/home/jedwards/sandboxes/cesm2_x_alpha/cime")
         filename = self.cime.get_machines_file()
         root.title("CIME Configurator")
         root.geometry(opt["geometry"])
@@ -58,16 +48,6 @@ class XMLMachines(tk.Frame):
             # strip the position information; keep only the size information
             opt['geometry'] = self.root.geometry().split('+')[0]
         self.root.destroy()
-
-
-class CIME_interface():
-    def __init__(self):
-        self.machinexml = None
-        
-    def get_machines_file(self):
-        filexml = files.Files(comp_interface="nuopc")
-        self.machinexml = filexml.get_value("MACHINES_SPEC_FILE")
-        return self.machinexml
 
         
 def main():

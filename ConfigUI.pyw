@@ -178,7 +178,6 @@ class VerticalScrolledFrame:
 		elif event.num == 5 or event.delta == -120:
 			self.canvas.yview_scroll(1, "units" )
 
-
 class AutoSelectEntry(ttk.Entry):
     elements = []
 
@@ -474,12 +473,15 @@ class XMLMachines(tk.Frame):
         self.root = master
         self.bsmachines = {}
         scrollbar = ttk.Scrollbar(self.root)
+
+
+
         self.display = ttk.Treeview(self.root, yscrollcommand=scrollbar.set, show="tree", selectmode="browse")
         scrollbar.configure(command=self.display.yview)
         scrollbar.pack(side="right", fill="y")
         self.display.pack(expand=True, fill=tk.BOTH)
 
-        self.define_buttons()
+          self.define_buttons()
 
         if debug: print("Loaded {} elements".format(len(AutoSelectEntry.elements)))
         self._frame = ttk.LabelFrame(master, text="Machine Selection")
