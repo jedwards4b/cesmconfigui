@@ -6,8 +6,10 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog as fd
 from tkinter.messagebox import showinfo, showerror
-import sys, os
-from src import CIME_interface
+import sys
+import os
+import json
+from classes.CIME_interface import CIME_interface
 
 # default options
 opt = {
@@ -15,12 +17,19 @@ opt = {
     'dir': "/glade/u/home/jedwards/sandboxes/cesm2_x_alpha/ccs_config/machines", # last seen directory
     'filename': "config_machines.xml",
     'geometry': "350x550",
-#    'save_position': True, # save the geometry and position of the window and restore on next load
+    'save_position': True, # save the geometry and position of the window and restore on next load
 #    'formats': 'config_machines.xml', # extensions of files to be listed; space delimited
 #    'entrybox_width': 25,  # width of the entry boxes
 #    'output_encoding': 'autodetect', # any valid encoding ('utf-8', 'utf-16le', etc) or autodetect.
     'backup_ext': '.bak', # extension of backed up files. Use something not in 'formats' to prevent backups from showing in the dropdown list.
     }
+# load global options dictionary
+opt_fn = "cimeconfigurator_options.json"
+try:
+    with open(opt_fn) as f:
+        opt.update(json.load(f))
+except Exception as e:
+    print("default options used due to", e)
 
 
 class XMLMachines(tk.Frame):

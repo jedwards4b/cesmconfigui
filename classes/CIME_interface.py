@@ -1,5 +1,6 @@
 import os
-
+import sys
+from importlib import import_module
 
 class CIME_interface():
     def __init__(self, cimeroot=None):
@@ -13,12 +14,12 @@ class CIME_interface():
         _LIBDIR = os.path.join(cimeroot,"CIME", "Tools")
         sys.path.append(_LIBDIR)
             
-        from CIME.XML import files
-
+        self.files = import_module('CIME.XML.files')
+        
 
         
     def get_machines_file(self):
-        filexml = files.Files(comp_interface="nuopc")
+        filexml = self.files.Files(comp_interface="nuopc")
         self.machinexml = filexml.get_value("MACHINES_SPEC_FILE")
         return self.machinexml
 
