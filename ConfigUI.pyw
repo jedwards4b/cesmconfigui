@@ -78,8 +78,8 @@ class FilePicker(tk.Frame):
         self.files = ttk.OptionMenu(hlm, self.file)
         self.files.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-#        btn = ttk.Button(hlm, text="Save", command=master.save)
-#        btn.pack(side=tk.LEFT)
+        btn = ttk.Button(hlm, text="Save", command=master.save)
+        btn.pack(side=tk.LEFT)
 
     def update_options(self, options):
         self.files['menu'].delete(0, tk.END)
@@ -459,9 +459,18 @@ class XMLMachineEditor(tk.Frame):
 
 class XMLMachines(tk.Frame):
     def __init__(self, master, bs):
-        tk.Frame.__init__(self, master.master)
+        tk.Frame.__init__(self, master)
+        master.title("CIME Configure and XML File Editor")
+        master.geometry(opt.get('geometry'))
+        master.protocol('WM_DELETE_WINDOW', self._quit)
+
         master.bind("<Control - S>", self.save)
         master.bind("<Control - s>", self.save)
+        self.top = FilePicker(self, command=self.load_file)
+        self.top.pack(fill=tk.X)
+
+        self.top.load_dir(opt.get('dir') or os.getcwd())
+
         self.root = master
         self.bsmachines = {}
         scrollbar = ttk.Scrollbar(self.root)
@@ -611,7 +620,7 @@ def istag(test):
 
 def main():
     root = tk.Tk()
-    window = GUI(root)
+    window = XMLMachines(root)
     window.pack(fill=tk.BOTH, expand=True)
     if len(sys.argv) > 1:
         window.top.load_path(" ".join(sys.argv[1:]))
