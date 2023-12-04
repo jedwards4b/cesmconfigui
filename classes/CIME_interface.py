@@ -1,6 +1,7 @@
 import os
 import sys
 from importlib import import_module
+debug = True
 
 class CIME_interface():
     def __init__(self, cimeroot=None):
@@ -27,8 +28,25 @@ class CIME_interface():
 
     def get_machines(self, config_machines):
         '''Get a list of supported machines from the config_machines.xml file.'''
-        self.machines = import_module('CIME.XML.machines')
-        machinesxml = self.machines.Machines(infile=config_machines)
-        return machinesxml.list_available_machines()
+        machines = import_module('CIME.XML.machines')
+        self.machinesxml = machines.Machines(infile=config_machines, read_only=False)
+        return self.machinesxml.list_available_machines()
 
     
+    def copy_machine(self, oldname, newname):
+        ''' copy machine node matching oldname to newname,
+        newname should not exist in file. '''
+        if debug: print(f"Get node for machine {oldname}")
+        nodes = self.machinesxml.get_children("machine")
+        for machnode in nodes:
+            if self.machinesxml.get(machnode, "MACH") == oldname:
+                oldnode = machnode
+                break
+
+        if debug: print(f"Copy node for machine {oldname}")
+        newnode = self.machinesxml.copy(oldnode)
+
+        if debug: print(f"Add name for node for machine {newname}")
+        
+        self.machinesxml.add_child(newnode)
+        self.machinesxml.set(newnode,"MACH", newname)

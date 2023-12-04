@@ -4,6 +4,7 @@ from tkinter import filedialog as fd
 import json
 import os
 from classes.CIME_interface import CIME_interface
+from classes.MachineXMLEditor import MachineXMLEditor
 
 debug = True
 
@@ -16,16 +17,19 @@ opt = {
 class CESMConfigMachineEditor(tk.Frame):
     def __init__(self, root=None):
         super().__init__(root)
-        self.pack()
+        self.grid()
         root.geometry(opt['root_geometry'])
         self.root = root
         self.filename = opt['config_machines']
         self.cimeroot = opt['cime_root']
         if debug: print(f"cime_root {self.cimeroot}, config_machines {self.filename}")
+        self.machine_selection_frame = tk.Frame(self)
+        self.machine_selection_frame.grid()
+        
         entrywidth = max(len(self.filename), len(self.cimeroot))
         
         # Frame for selecting the CIME_ROOT directory
-        self.cime_root_selection_frame = tk.Frame(self)
+        self.cime_root_selection_frame = tk.Frame(self.machine_selection_frame)
         self.cime_root_label = tk.Label(self.cime_root_selection_frame, text="CIME ROOT Directory:")
         self.cime_root_label.grid(row=0, column=0, sticky='W')
         self.cime_root_entry = tk.Entry(self.cime_root_selection_frame, width=entrywidth)
@@ -37,7 +41,7 @@ class CESMConfigMachineEditor(tk.Frame):
         self.cime_root_entry.insert(0, opt['cime_root'])
         
         # Frame for selecting the config_machines.xml file
-        self.file_selection_frame = tk.Frame(self)
+        self.file_selection_frame = tk.Frame(self.machine_selection_frame)
         self.file_selection_frame.grid(row=1, column=0, sticky='NSEW')
 
         self.filename_label = tk.Label(self.file_selection_frame, text="Config Machines XML File:")
@@ -52,7 +56,7 @@ class CESMConfigMachineEditor(tk.Frame):
         self.select_file_button = tk.Button(self.file_selection_frame, text="Select File", command=self.select_file)
         self.select_file_button.grid(row=0, column=2, sticky='E')
 
-        self.machinelist_frame = tk.Frame(self)
+        self.machinelist_frame = tk.Frame(self.machine_selection_frame)
         scrollbar = ttk.Scrollbar(self.machinelist_frame)
         self.display = ttk.Treeview(self.machinelist_frame, yscrollcommand=scrollbar.set, show="tree", selectmode="browse")
         self.get_machineslist()
@@ -136,9 +140,10 @@ class CESMConfigMachineEditor(tk.Frame):
         """ Edit the selected machine description """
         machine = self.display.item(self.display.selection()[0], option="text")
         if debug: print(f"edit machine called, machine is {machine}")
-#        ew = tk.Toplevel(self)
-#        ew.title("Machine XML Editor")
-#        XMLMachineEditor(ew, self.bsmachines[machine])
+        self.ew = MachineXMLEditor(self, machine)
+
+
+        #        XMLMachineEditor(ew, self.bsmachines[machine])
 
     def copy_machine(self):
         """ Copy the given machine description into a new machnine name """
@@ -147,14 +152,14 @@ class CESMConfigMachineEditor(tk.Frame):
         if debug: print(f"copy machine called, machine is {machine}")
         new_machine_name = tk.simpledialog.askstring(title="Copy", prompt="Enter the new machine name:")
         if debug: print(f"new_machine is {new_machine_name}")
-        if new_machine_name in self.bsmachines:
+        if new_machine_name in self.machineslist:
             print(f"ERROR: match to name in list")
         elif new_machine_name:
-            
-            self.bsmachines[new_machine_name] = copy.copy(self.bsmachines[machine])
-            self.bsmachines[new_machine_name].attrs["MACH"] = new_machine_name
-            self.bsmachines[machine].find_parent().append(self.bsmachines[new_machine_name])
+            self.cime.copy_machine(machine, new_machine_name)
+            self.machineslist.append(new_machine_name)
             self.display.insert("", "end", text=new_machine_name)
+            self.display.selection_set(self.display.get_children()[-1])
+            self.edit_machine()
             
     def delete_machine(self):
         """ Delete the given machine - eventually this should apply to all cesm config xml files """
@@ -166,7 +171,7 @@ class CESMConfigMachineEditor(tk.Frame):
         del self.bsmachines[machine]
 
     def define_buttons(self):
-        frame = ttk.Frame(self.root)
+        frame = ttk.Frame(self.machine_selection_frame)
         frame.columnconfigure(0, weight=1)
         newmach = ttk.Button(frame, text="New", command=self.new_machine)
         editmach = ttk.Button(frame, text="Edit", command=self.edit_machine)
@@ -174,7 +179,8 @@ class CESMConfigMachineEditor(tk.Frame):
         deletemach = ttk.Button(frame, text="Delete", command=self.delete_machine)
         saveall = ttk.Button(frame, text="Save", command=self.saveall)
         cancel = ttk.Button(frame, text="Cancel", command=self.cancel)
-        frame.pack(side=tk.BOTTOM)
+        next_row = self.machine_selection_frame.grid_size()[1]
+        frame.grid(row=next_row,column=0)
         newmach.grid(row=0,column=0)
         editmach.grid(row=0,column=1)
         copymach.grid(row=0,column=2)
