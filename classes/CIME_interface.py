@@ -18,8 +18,17 @@ class CIME_interface():
         
 
         
-    def get_machines_file(self):
-        filexml = self.files.Files(comp_interface="nuopc")
-        self.machinexml = filexml.get_value("MACHINES_SPEC_FILE")
-        return self.machinexml
+    def get_machines_file(self, filename=None):
+        if filename:
+            self.filename = filename
+        else:
+            filexml = self.files.Files(comp_interface="nuopc")
+            self.filename = filexml.get_value("MACHINES_SPEC_FILE")
 
+    def get_machines(self, config_machines):
+        '''Get a list of supported machines from the config_machines.xml file.'''
+        self.machines = import_module('CIME.XML.machines')
+        machinesxml = self.machines.Machines(infile=config_machines)
+        return machinesxml.list_available_machines()
+
+    

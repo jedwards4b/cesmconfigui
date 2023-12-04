@@ -1,80 +1,188 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-#  This program requires python 3.6 or newer with the BeautifulSoup package to run
-
 import tkinter as tk
 from tkinter import ttk
-from tkinter import filedialog as fd
-from tkinter.messagebox import showinfo, showerror
-import sys
-import os
+from tkinter import filedialog as fd   
 import json
+import os
 from classes.CIME_interface import CIME_interface
 
-# default options
+debug = True
+
 opt = {
-    # Todo: make this general
-    'dir': "/glade/u/home/jedwards/sandboxes/cesm2_x_alpha/ccs_config/machines", # last seen directory
-    'filename': "config_machines.xml",
-    'geometry': "350x550",
-    'save_position': True, # save the geometry and position of the window and restore on next load
-#    'formats': 'config_machines.xml', # extensions of files to be listed; space delimited
-#    'entrybox_width': 25,  # width of the entry boxes
-#    'output_encoding': 'autodetect', # any valid encoding ('utf-8', 'utf-16le', etc) or autodetect.
-    'backup_ext': '.bak', # extension of backed up files. Use something not in 'formats' to prevent backups from showing in the dropdown list.
-    }
-# load global options dictionary
-opt_fn = "cimeconfigurator_options.json"
-try:
-    with open(opt_fn) as f:
-        opt.update(json.load(f))
-except Exception as e:
-    print("default options used due to", e)
+    'config_machines':  "/glade/u/home/jedwards/sandboxes/cesm2_x_alpha/ccs_config/machines/config_machines.xml", # last seen directory
+    'cime_root': os.getenv("CIME_ROOT"),
+    'root_geometry': '1000x350'
+}
 
-
-class XMLMachines(tk.Frame):
-    def __init__(self, root):
-        tk.Frame.__init__(self, root)
-        self.cime = CIME_interface(cimeroot="/glade/u/home/jedwards/sandboxes/cesm2_x_alpha/cime")
-        filename = self.cime.get_machines_file()
-        root.title("CIME Configurator")
-        root.geometry(opt["geometry"])
-        root.protocol('WM_DELETE_WINDOW', self._quit)
+class CESMConfigMachineEditor(tk.Frame):
+    def __init__(self, root=None):
+        super().__init__(root)
+        self.pack()
+        root.geometry(opt['root_geometry'])
         self.root = root
-        self.data_frame = tk.Frame(self)
-        scrollbar = ttk.Scrollbar(self.root)
-        self.display = ttk.Treeview(self.root, yscrollcommand=scrollbar.set, show="tree", selectmode="browse")
+        self.filename = opt['config_machines']
+        self.cimeroot = opt['cime_root']
+        if debug: print(f"cime_root {self.cimeroot}, config_machines {self.filename}")
+        entrywidth = max(len(self.filename), len(self.cimeroot))
+        
+        # Frame for selecting the CIME_ROOT directory
+        self.cime_root_selection_frame = tk.Frame(self)
+        self.cime_root_label = tk.Label(self.cime_root_selection_frame, text="CIME ROOT Directory:")
+        self.cime_root_label.grid(row=0, column=0, sticky='W')
+        self.cime_root_entry = tk.Entry(self.cime_root_selection_frame, width=entrywidth)
+        self.cime_root_entry.grid(row=0, column=1, sticky='EW')
+        self.cime_root_button = tk.Button(self.cime_root_selection_frame, text="Select CIME_ROOT", command=self.select_cime_root)
+        self.cime_root_button.grid(row=0, column=4, sticky='E')
+        self.cime_root_selection_frame.grid(row=0, column=0, sticky='NSEW')
+        self.cime_root_entry.delete(0, tk.END)
+        self.cime_root_entry.insert(0, opt['cime_root'])
+        
+        # Frame for selecting the config_machines.xml file
+        self.file_selection_frame = tk.Frame(self)
+        self.file_selection_frame.grid(row=1, column=0, sticky='NSEW')
+
+        self.filename_label = tk.Label(self.file_selection_frame, text="Config Machines XML File:")
+        self.filename_label.grid(row=0, column=0, sticky='W')
+
+        self.filename_entry = tk.Entry(self.file_selection_frame, width=entrywidth)
+        self.filename_entry.grid(row=0, column=1, sticky='EW')
+        self.filename_entry.delete(0, tk.END)
+
+        self.filename_entry.insert(0, self.filename)
+
+        self.select_file_button = tk.Button(self.file_selection_frame, text="Select File", command=self.select_file)
+        self.select_file_button.grid(row=0, column=2, sticky='E')
+
+        self.machinelist_frame = tk.Frame(self)
+        scrollbar = ttk.Scrollbar(self.machinelist_frame)
+        self.display = ttk.Treeview(self.machinelist_frame, yscrollcommand=scrollbar.set, show="tree", selectmode="browse")
+        self.get_machineslist()
         scrollbar.configure(command=self.display.yview)
-        scrollbar.pack(side="right", fill="y")
-        self.display.pack(expand=True, fill=tk.BOTH)
-
+        scrollbar.pack(side="right", fill='y')
+        self.display.pack(expand=True, side=tk.BOTTOM, fill=tk.BOTH)
+        self.machinelist_frame.grid(row=2,column=0, sticky='S')
+        self.define_buttons()
+        
+        
+    def get_machineslist(self):
+        self.cime = CIME_interface(cimeroot=self.cimeroot)
+        self.machineslist = self.cime.get_machines(self.filename)
+        if debug: print(f"List of machines: {self.machineslist}")
+        for mach in self.machineslist:
+            self.display.insert("", "end", text=mach)
         
 
-    def _quit(self):
-        if opt.get('save_position'):
-            opt['geometry'] = self.root.geometry()
+        
+        # Frame for editing machine information
+        # self.machine_info_frame = tk.Frame(self)
+        # self.machine_info_frame.grid(row=2, column=0, columnspan=2)
+
+        # self.machine_name_label = tk.Label(self.machine_info_frame, text="Machine Name:")
+        # self.machine_name_label.grid(row=0, column=0)
+        # self.machine_name_entry = tk.Entry(self.machine_info_frame)
+        # self.machine_name_entry.grid(row=0, column=1)
+
+        # self.machine_type_label = tk.Label(self.machine_info_frame, text="Machine Type:")
+        # self.machine_type_label.grid(row=1, column=0)
+        # self.machine_type_entry = tk.Entry(self.machine_info_frame)
+        # self.machine_type_entry.grid(row=1, column=1)
+
+        # self.machine_cores_label = tk.Label(self.machine_info_frame, text="Machine Cores:")
+        # self.machine_cores_label.grid(row=2, column=0)
+        # self.machine_cores_entry = tk.Entry(self.machine_info_frame)
+        # self.machine_cores_entry.grid(row=2, column=1)
+
+#        self.save_button = tk.Button(self.machine_info_frame, text="Save Changes", command=self.save_changes)
+#        self.save_button.grid(row=3, column=0, columnspan=2)
+
+    def select_file(self):
+        filename = fd.askopenfilename(filetypes=[("XML Files", "*.xml")])
+        if filename:
+            self.filename = filename
+            self.filename_entry.delete(0, tk.END)
+        self.filename_entry.insert(0, filename)
+        # Load the selected file's contents
+        self.get_machineslist(filename)
+
+    def select_cime_root(self):
+        if opt['cime_root']:
+            initial_dir = opt['cime_root']
         else:
-            # strip the position information; keep only the size information
-            opt['geometry'] = self.root.geometry().split('+')[0]
-        self.root.destroy()
+            initial_dir = os.cwd()
+        cime_root = fd.askdirectory(mustexist=True, initialdir=initial_dir)
+        if cime_root:
+            self.cime_root = cime_root
+            self.cime_root_entry.delete(0, tk.END)
+        self.cime_root_entry.insert(0, filename)
 
+        # Load the selected file's contents
+        #        self.file = File(filename, "r")
+        #        self.machine_element = self.file.get_root_element("machine")
+    def saveall(self):
+        """ Write updated XML object to file """
         
-def main():
-    root = tk.Tk()
-    window = XMLMachines(root)
-    window.pack(fill=tk.BOTH, expand=True)
-    if len(sys.argv) > 1:
-        window.top.load_path(" ".join(sys.argv[1:]))
-    root.mainloop()
-    with open(opt_fn, 'w') as f:
-        json.dump(opt, f, indent=2)
+        if debug: print("saveall called")
 
+    def cancel(self):
+        """ Cancel the changes to config_machines """
+        
+        if debug: print("cancel called")
 
+    def new_machine(self):
+        """ Copy the example machine description into a new machine name """
+        
+        if debug: print("new machine called")
+
+    def edit_machine(self):
+        """ Edit the selected machine description """
+        machine = self.display.item(self.display.selection()[0], option="text")
+        if debug: print(f"edit machine called, machine is {machine}")
+#        ew = tk.Toplevel(self)
+#        ew.title("Machine XML Editor")
+#        XMLMachineEditor(ew, self.bsmachines[machine])
+
+    def copy_machine(self):
+        """ Copy the given machine description into a new machnine name """
+        
+        machine = self.display.item(self.display.selection()[0], option="text")
+        if debug: print(f"copy machine called, machine is {machine}")
+        new_machine_name = tk.simpledialog.askstring(title="Copy", prompt="Enter the new machine name:")
+        if debug: print(f"new_machine is {new_machine_name}")
+        if new_machine_name in self.bsmachines:
+            print(f"ERROR: match to name in list")
+        elif new_machine_name:
+            
+            self.bsmachines[new_machine_name] = copy.copy(self.bsmachines[machine])
+            self.bsmachines[new_machine_name].attrs["MACH"] = new_machine_name
+            self.bsmachines[machine].find_parent().append(self.bsmachines[new_machine_name])
+            self.display.insert("", "end", text=new_machine_name)
+            
+    def delete_machine(self):
+        """ Delete the given machine - eventually this should apply to all cesm config xml files """
+        machine = self.display.item(self.display.selection()[0], option="text")
+        if debug: print(f"delete machine called, machine is {machine}")
+        
+        self.display.delete(self.display.focus())
+        self.bsmachines[machine].decompose()
+        del self.bsmachines[machine]
+
+    def define_buttons(self):
+        frame = ttk.Frame(self.root)
+        frame.columnconfigure(0, weight=1)
+        newmach = ttk.Button(frame, text="New", command=self.new_machine)
+        editmach = ttk.Button(frame, text="Edit", command=self.edit_machine)
+        copymach = ttk.Button(frame, text="Copy", command=self.copy_machine)
+        deletemach = ttk.Button(frame, text="Delete", command=self.delete_machine)
+        saveall = ttk.Button(frame, text="Save", command=self.saveall)
+        cancel = ttk.Button(frame, text="Cancel", command=self.cancel)
+        frame.pack(side=tk.BOTTOM)
+        newmach.grid(row=0,column=0)
+        editmach.grid(row=0,column=1)
+        copymach.grid(row=0,column=2)
+        deletemach.grid(row=0,column=3)
+        saveall.grid(row=0,column=5)
+        cancel.grid(row=0,column=6)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        showerror("Fatal error!", "CIME Editor crashed.\n\n"+str(e))
-        raise
-
+    root = tk.Tk()
+    cimeeditor = CESMConfigMachineEditor(root)
+    cimeeditor.mainloop()
