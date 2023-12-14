@@ -5,12 +5,14 @@ import json
 import os
 from classes.CIME_interface import CIME_interface
 from classes.MachineXMLEditor import MachineXMLEditor
+from classes.GIT_interface import GIT_interface
 
 debug = True
 
 opt = {
     'config_machines':  "/glade/u/home/jedwards/sandboxes/cesm2_x_alpha/ccs_config/machines/config_machines.xml", # last seen directory
-    'cime_root': os.getenv("CIME_ROOT"),
+    'cime_root': os.getenv("CIMEROOT"),
+    'cesm_repo_list': ["https://github.com/ESCOMP/cesm"],
     'root_geometry': '1000x350'
 }
 
@@ -22,6 +24,7 @@ class CESMConfigMachineEditor(tk.Frame):
         self.root = root
         self.filename = opt['config_machines']
         self.cimeroot = opt['cime_root']
+
         if debug: print(f"cime_root {self.cimeroot}, config_machines {self.filename}")
         self.machine_selection_frame = tk.Frame(self)
         self.machine_selection_frame.grid()
@@ -190,5 +193,20 @@ class CESMConfigMachineEditor(tk.Frame):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    cimeeditor = CESMConfigMachineEditor(root)
-    cimeeditor.mainloop()
+    root.title("CIME XML Configurator")
+    cimeeditor = None
+    if not opt['cime_root'] and os.path.isdir(os.path.join(os.getcwd(),'cesm','cime')):
+        opt['cime_root'] = os.path.join(os.getcwd(),'cesm', 'cime')
+
+    if opt['cime_root']:
+        os.environ['CIMEROOT'] = opt['cime_root']
+        cimeeditor = CESMConfigMachineEditor(root)
+    else:
+        gitimport = GIT_interface(root, opt['cesm_repo_list'])
+        gitimport.mainloop()  # Wait for GIT interface to finish
+        if gitimport.clone_successful:  # Check if cloning was successful
+            cimeeditor = CESMConfigMachineEditor(root)
+
+    if cimeeditor:  # Only if CESM editor is created
+        cimeeditor.mainloop()        
+        
