@@ -32,6 +32,9 @@ class CIME_interface():
         self.machinesxml = machines.Machines(infile=config_machines, read_only=False)
         return self.machinesxml.list_available_machines()
 
+
+    def get_machine_name(self):
+        return self.machinesxml.get_machine_name()
     
     def copy_machine(self, oldname, newname):
         ''' copy machine node matching oldname to newname,

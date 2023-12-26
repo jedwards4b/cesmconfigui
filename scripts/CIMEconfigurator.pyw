@@ -74,11 +74,18 @@ class CESMConfigMachineEditor(tk.Frame):
         self.cime = CIME_interface(cimeroot=self.cimeroot)
         self.machineslist = self.cime.get_machines(self.filename)
         if debug: print(f"List of machines: {self.machineslist}")
+        current_machine_name = self.cime.get_machine_name()
         for mach in self.machineslist:
-            self.display.insert("", "end", text=mach)
-        
+            item = self.display.insert("", "end", text=mach)
+            if mach == current_machine_name:
+                self.display.selection_set(item)
+            
+#        print(f"current_machine_name {current_machine_name}")
+#        current_machine_index = self.display.get_children().index(current_machine_name)
+#        print(f"current_machine_name {current_machine_name} current_machine_index {current_machine_index}")
+#        self.display.selection_set(self.display.get_children()[current_machine_index])
 
-        
+            
         # Frame for editing machine information
         # self.machine_info_frame = tk.Frame(self)
         # self.machine_info_frame.grid(row=2, column=0, columnspan=2)
@@ -143,8 +150,10 @@ class CESMConfigMachineEditor(tk.Frame):
         """ Edit the selected machine description """
         machine = self.display.item(self.display.selection()[0], option="text")
         if debug: print(f"edit machine called, machine is {machine}")
-        self.ew = MachineXMLEditor(self, machine)
-
+        for widget in self.winfo_children():
+            widget.destroy()
+        ew = MachineXMLEditor(self, machine, self.cime)
+        
 
         #        XMLMachineEditor(ew, self.bsmachines[machine])
 
